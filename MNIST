@@ -1,0 +1,135 @@
+# coding=utf-8
+import os
+import gzip
+import numpy as np
+from urllib import urlretrieve
+np.seterr(all = 'ignore')
+
+
+
+
+def load_mnist_set() :
+
+    def download(filename, source='http://yann.lecun.com/exdb/mnist/'):
+        urlretrieve(source + filename, filename)
+
+    def load_mnist_images(filename):
+        if not os.path.exists(filename):
+            download(filename)
+        with gzip.open(filename, 'rb') as f:
+            data = np.frombuffer(f.read(), np.uint8, offset=16)
+        data = data.reshape(-1, 1, 28, 28)
+        return data / np.float32(256)
+
+    def load_mnist_labels(filename):
+        if not os.path.exists(filename):
+            download(filename)
+        with gzip.open(filename, 'rb') as f:
+            data = np.frombuffer(f.read(), np.uint8, offset=8)
+        return data
+
+    X_train = load_mnist_images('train-images-idx3-ubyte.gz')
+    y_train = load_mnist_labels('train-labels-idx1-ubyte.gz')
+    X_test = load_mnist_images('t10k-images-idx3-ubyte.gz')
+    y_test = load_mnist_labels('t10k-labels-idx1-ubyte.gz')
+
+    return X_train, y_train, X_test, y_test
+
+
+#sigmoid를 구현한 함수입니다
+def sigmoid(x, wantD=False) :
+    if(wantD==True):
+        return x*(1-x)
+    else:
+        return 1 / (1 + np.exp(-x))
+
+
+
+
+#feed forward를 하는 함수입니다
+def feed_forward(X, weight1, weight2) :
+
+    result_hidden = np.zeros(100)
+    test_x = X
+    input_layer = test_x.reshape(784)
+    hidden_layer = np.dot(input_layer, weight1)
+    hidden_layer = sigmoid(hidden_layer)
+    output_layer = np.dot(hidden_layer, weight2)
+    output_layer = sigmoid(output_layer)
+
+
+    return input_layer, hidden_layer, output_layer
+
+
+
+#back propagation을 하는 함수입니다
+def back_propagation(X, y) :
+
+    learning_rate = 0.6
+    weight1 = np.random.uniform(-1, 1, [num_input, num_hid1]).astype('float32')
+    weight2 = np.random.uniform(-1, 1, [num_hid1, num_output]).astype('float32')
+
+
+    for epoch in range(10):
+        total_error = 0
+        for i in range(60000):
+            #X값, 그리고 i값 , 그리고 각각 weight값을 넘긴다
+            input_layer, hidden_layer, output_layer = feed_forward(X[i][0], weight1, weight2)
+
+
+            #one-hot벡터로 바꿔준다
+            y_value = np.zeros(10)
+            y_value[y[i]] = 1.0
+            output_error = output_layer - y_value
+            output_gradient = output_error* sigmoid(output_layer, True)
+
+            hidden_error = np.dot(output_gradient, weight2.T)
+            hidden_gradient = hidden_error * sigmoid(hidden_layer, True)
+
+            weight2 = weight2 - (learning_rate * np.reshape(hidden_layer,(-1,1)) * output_gradient)
+            weight1 = weight1 - (learning_rate * np.reshape(input_layer,(-1,1)) * hidden_gradient)
+
+            total_error += -1 * sum(y_value * (np.log(output_layer)) + (1 - y_value) * np.log(1 - output_layer))
+
+
+        print("지금 epoch는 " + str(epoch) + " 째 입니다")
+        print("error_rate는 " + str(total_error))
+
+        compareTestCase(X_test,y_test, weight1, weight2)
+
+    return weight1, weight2, output_error
+
+
+def compareTestCase(X, y, weight1, weight2):
+
+    correct_num = 0.0
+    test_case = 1000
+    for i in range(test_case):
+        input_layer, hidden_layer, output_layer = feed_forward(X[i][0], weight1, weight2);
+        temp = -987654321
+        temp_index=0
+        for j in range(10):
+            if(temp < output_layer[j]):
+                temp = output_layer[j]
+                temp_index = j
+
+        if(y[i]==temp_index):
+            correct_num = correct_num +1.0
+
+        print(str(y[i]) +" --> " + str(temp_index))
+
+    print("정답률 : " +str(correct_num / test_case))
+
+
+print("Loading data...")
+X_train, y_train, X_test, y_test = load_mnist_set()
+print("Loading complete!")
+
+
+num_input = 784
+num_hid1 = 100
+num_output = 10
+
+weight1, weight2, output_error = back_propagation(X_train,y_train)
+
+
